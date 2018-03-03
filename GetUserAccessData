@@ -1,0 +1,52 @@
+import boto3
+import csv
+import datetime
+from time import gmtime, strftime
+import smtplib  
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText 
+import os
+
+client = boto3.client('iam')
+s3 = boto3.resource('s3')
+def lambda_handler(event, context):
+    
+    users = client.list_users()
+    user_list = []
+    result = '\n User ,Policy, MFA Enabled, Groups\n'
+    
+    for key in users['Users']:
+        ResultPolicy = ''
+        Policies = []
+        Groups=''
+        userName=key['UserName']
+        List_of_inlinePolicies =  client.list_user_policies(UserName=key['UserName'])
+        List_of_managedPolicies =  client.list_attached_user_policies(UserName=key['UserName'])
+        Policies = List_of_inlinePolicies['PolicyNames']
+        for p in Policies:
+            ResultPolicy += p + ' ; '
+        Policies = List_of_managedPolicies['AttachedPolicies']
+        for p in Policies: 
+            ResultPolicy += p['PolicyName'] + ' ; '
+        List_of_Groups =  client.list_groups_for_user(UserName=key['UserName'])
+    
+        for Group in List_of_Groups['Groups']:
+            Groups += Group['GroupName'] + ' ; '
+    
+        List_of_MFA_Devices = client.list_mfa_devices(UserName=key['UserName'])
+    
+        if not len(List_of_MFA_Devices['MFADevices']):
+            isMFADeviceConfigured='False'   
+        else:
+            isMFADeviceConfigured='True'    
+        result += userName + ',' + ResultPolicy + ','+ isMFADeviceConfigured + ',' + Groups +'\n'
+    print(result)
+    date_fmt = strftime("%Y_%m_%d", gmtime())
+    filepath ='/tmp/UserDetails_' + date_fmt + '.csv'    
+    outF = open(filepath, "w")
+    outF.write(result)
+    outF.close()
+    filename ='UserDetails_' + date_fmt + '.csv'
+    s3.Object('virtualsingh', filename).put(Body=open(filepath, 'rb'))
+     
