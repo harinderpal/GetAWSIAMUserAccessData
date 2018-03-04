@@ -2,10 +2,6 @@ import boto3
 import csv
 import datetime
 from time import gmtime, strftime
-import smtplib  
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email.mime.text import MIMEText 
 import os
 
 client = boto3.client('iam')
